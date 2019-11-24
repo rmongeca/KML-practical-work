@@ -3,7 +3,7 @@
 #               2.                                                          #
 #INPUT DATA...=                                                             #
 #R VERSION....= R version 3.5.1 (2018-07-02) Feather Spray                  # 
-#AUTHOR.......= Maria Gkotsopoulou   & Ricard Monge Calvo                   #
+#AUTHOR.......= Maria Gkotsopoulou & Ricard Monge Calvo                     #
 #CREATED......= December 2019                                               #
 #---------------------------------------------------------------------------#
 

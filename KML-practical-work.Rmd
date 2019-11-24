@@ -1,0 +1,46 @@
+---
+title: "KML Practical Work"
+author: "Maria Gkotsopoulou & Ricard Monge"
+date: "01/12/2019"
+geometry: margin=1.5cm
+output: 
+  pdf_document: 
+    latex_engine: xelatex
+classoption: twocolumn
+fontsize: 11pt
+spacing: single
+subparagraph: yes
+header-includes: |
+  \usepackage{titlesec}
+  \usepackage{subfig}
+  \titlespacing{\section}{0pt}{10pt plus 1pt minus 1pt}{0pt plus 1pt minus 1pt}
+  \titlespacing{\subsection}{0pt}{10pt plus 1pt minus 1pt}{0pt plus 1pt minus 1pt}
+  \titlespacing{\subsubsection}{0pt}{10pt plus 1pt minus 1pt}{0pt plus 1pt minus 1pt}
+bibliography: references.bib
+nocite: ‘@*’
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+set.seed(42)
+```
+
+
+# Abstract
+
+# Introduction
+
+# Previous work
+
+# Theory
+
+# Experiments
+
+# Results
+
+# Conclusions & future work
+
+
+# References
+
+  
