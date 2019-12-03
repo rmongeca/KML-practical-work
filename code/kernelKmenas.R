@@ -19,10 +19,11 @@ make.sinusoidals <- function(m,noise=0.2)
 data <- make.sinusoidals(100,noise=0.3)
 plot(data$x1, data$x2, col=data$target)
 
-## Mock Kernel matrix
+# Mock Kernel matrix
 rbf.kernel <- function(x, y, sigma=10) {
   return(exp(-sum((x-y)^2)^2/(2*sigma^2)))
 }
+kernelFun <- "id"
 kernel <- switch(kernelFun,
                  rbf=rbfdot(sigma = 1),
                  id=polydot(degree = 1, scale = 1, offset = 0))
@@ -90,20 +91,24 @@ kernel.kmeans <- function(
   return(Z)
 }
 
-# Test functions agains normal kmeans
+# Test functions agains normal kmeans with kernel=Identity
 clusters <- 10
+# Mock assignments
 assignments <- matrix(0, nrow = nrow(K), ncol = clusters)
 part <- nrow(K)/clusters +1
 rassign <- sapply(1:nrow(K)/part, function(x) floor(x)+1)
 for(i in 1:nrow(K)) {
   assignments[i,rassign[i]] <- 1
 }
+# Own Kernel Kmeans
 Z <- kernel.kmeans(K, clusters = clusters, iter.max = 10,
                    assignments = assignments)
 target <- apply(Z, 1, which.max)
+# Regular Kmeans
 centers <- (t(assignments) %*% as.matrix(data[,1:2])) / apply(assignments, 2, sum)
 kmns <- kmeans(data[,1:2], iter.max = 10,
                centers = centers)
+# See cluster distribution on mock data to see their are equal
 plot(data$x1, data$x2, col=target)
 plot(data$x1, data$x2, col=kmns$cluster)
 
