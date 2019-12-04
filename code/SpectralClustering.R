@@ -1,20 +1,19 @@
 
-######################################################
-##############      functions ##############
-######################################################
-
-# A Gaussian kernel, s, to calculate the similarity between two points.
-s <- function(x1, x2, alpha=1) {
-  exp(- alpha * norm(as.matrix(x1-x2), type="F"))
-}
-
-#compute a restricted (or filtered) “affinity” between vertices using k-nearest neighbors.
-make.affinity <- function(S, n.neighboors=2) {
+spectralClustering <- function(
+  S, #similarity matrix, S,
+  n.neighboors=round(log(dim(S)[1])), #choose k as per the assymptotic connectivity results
+  clusters, # Number of clusters
+  laplacian = "normalizedRandomWalk", # or unnormalized,normalizedSymmetric
+  method = "kmeans" #pam or discretization
+  ){
+  # transform a given set of x_1,...,x_n with pairwise similarities S into a graph
+  # connect vertex v_i with v_j if v_j is among the k-nearest neighboor of v_i
+  # leads to a directed graph since neighboorhood relationship is not symmetric
   N <- length(S[,1])
-  
   if (n.neighboors >= N) {  # fully connected
     A <- S
   } else {
+    # A must be made of positive values and be symmetric.
     A <- matrix(rep(0,N^2), ncol=N)
     for(i in 1:N) { # for each line
       # only connect to those points with larger similarity
@@ -22,65 +21,52 @@ make.affinity <- function(S, n.neighboors=2) {
       for (s in best.similarities) {
         j <- which(S[i,] == s)
         A[i,j] <- S[i,j]
-        A[j,i] <- S[i,j] # to make an undirected graph, ie, the matrix becomes symmetric
+        # solution applied to make the graph undirected so A is symmetric 
+        # if A_ij is selected as a nearest neighboor, so will A_ji.
+        A[j,i] <- S[i,j] 
       }
     }
   }
-  A
-}
-
-make.similarity <- function(my.data, similarity) {
-  N <- nrow(my.data)
-  S <- matrix(rep(NA,N^2), ncol=N)
-  for(i in 1:N) {
-    for(j in 1:N) {
-      if (i!=j) {
-        S[i,j] <- similarity(my.data[i,], my.data[j,])
-      } else {
-        S[i,j] <- 0
-      }
-    }
+  # degree matrix D where each diagonal value is the degree of the respective vertex 
+  # and all other positions are zero
+  D <- diag(apply(A, 1, sum))
+  # Calculate the Laplacian,
+  # matrix power operator: computes M^power (M must be diagonalizable)
+  "%^%" <- function(M, power)
+    with(eigen(M), vectors %*% (values^power * solve(vectors)))
+  # which laplacian ? look at the degree distribution of the similarity graph
+  if(laplacian=="unnormalized"){ # Shi and Malik (2000)
+    L <- D - A
+  } else if(laplacian == "normalizedSymmetric"){ #Ng, Jordan, and Weiss (2002)
+    L <- (D %^% (-1/2)) %*% A %*% (D %^% (-1/2))
+    # additional multiplication D might lead to 
+  } else if(laplacian=="normalizedRandomWalk"){ # preferred by Von Luxburg, U. (2007). 
+    # cluster indicator vectors 1_{A_i}
+    L <- (D %^% (-1)) %*% A
   }
-  S
+  # Compute eigenvectors and eigenvalues of L
+  # since we use the k nearest neighbor graph obtained Laplacian will be sparse
+  evL <- eigen(L, symmetric=TRUE)
+  # choose eigenvectors
+  n <- ncol(S)
+  Z <- evL$vectors[,((n-clusters+1):n)]
+  if(method=="kmeans"){
+    C<- kmeans(Z, centers=clusters, nstart=5)
+    classes <- C$cluster
+  }else if(method=="pam"){
+    classes <- cluster::pam(x = Z, k = clusters,cluster.only=TRUE,diss = FALSE)
+  }else if(method=="discretization"){
+    source("code/internal.R")
+    res <- sort(abs(evL$values),index.return = TRUE)
+    U <- evL$vectors[,res$ix[1:clusters]]
+    eigDiscrete = .discretisation(U)
+    eigDiscrete = eigDiscrete$discrete
+    classes = apply(eigDiscrete,1,which.max)
+  }
+  assignments <- matrix(0, nrow = length(classes), ncol = length(unique(classes)))
+  for(i in 1:length(classes)) {
+    assignments[i,classes[i]] <- 1
+  }
+  return(assignments)
 }
-######################################################
-##############      algorithm ##############
-######################################################
-# 1.Compute the similarity matrix, S, between all points 
-# 2.Calculate the affinity matrix, A, from S by applying k-nearest neighbors algorithm
-# 3.Compute the weighted degree diagonal matrix, D, from A by summing across each row
-# 4.Calculate the unnormalized Laplacian, U, by subtracting A from D
-# 5.Compute eigenvectors and eigenvalues of U.
-# 6.Perform k-means clustering on k smallest eigenvalues, ignoring the smallest (constant) eigenvector
-######################################################
-library(kernlab)
-data(spirals)
-
-# 1.Compute the similarity matrix, S, between all points 
-S <- make.similarity(spirals, s)
-# 2.Calculate the affinity matrix, A, from S by applying k-nearest neighbors algorithm
-# n.neighboors parameter needs to be adjusted depending on the data 
-A <- make.affinity(S, 3)  
-# 3. Compute the weighted degree diagonal matrix, D, from A by summing across each row
-D <- diag(apply(A, 1, sum))
-# 4.Calculate the unnormalized Laplacian, U, by subtracting A from D
-##  
-# i.Simple Laplacian L=D-A
-# ii.Normalized Laplacian L_{N}=D^{-1/2}LD^{-1/2}
-# iii.Generalized Laplacian L_{G} = D^{-1}L
-# iv.Relaxed Laplacian L_{\rho} = L-\rho D 
-# v.Ng, Jordan, & Weiss Laplacian L_{NJW}=D^{-1/2}AD^{-1/2}, and where A_{i,i}=0 
-# vi.smoothed Kernel for Kmeans Kernel Clustering  K=\sigma D^{-1}+D^{-1}AD^{-1} 
-##
-#Left multiplying by a diagonal matrix is akin to scaling the rows, 
-#but right multiplying by a diagonal matrix is akin to scaling the columns.  
-#The generalized Laplacian results in a right-stochastic Markov matrix ; the normalized Laplacian does not.
-##  
-U <- D - A
-# 5.Compute eigenvectors and eigenvalues of U.
-evL <- eigen(U, symmetric=TRUE)
-# performing k-means on eigenvectors of a similarity kernel applied to the original data.
-k   <- 2
-Z   <- evL$vectors[,(ncol(evL$vectors)-k+1):ncol(evL$vectors)]
-km <- kmeans(Z, centers=k, nstart=5)
 
