@@ -1,5 +1,5 @@
 library(kernlab)
-
+library(dplyr)
 #######  Mock data ###### 
 make.sinusoidals <- function(m,noise=0.2) 
 {
@@ -53,7 +53,7 @@ rbf<-function(x,y,q=0.2){
 }
 
 
-###### yet another alternative func rbf & kernel matrix ###### 
+###### Option B: yet another alternative func rbf & kernel matrix ###### 
 rbfkernelMx <-function(X, sigma = 1, Y = NULL){
     # test if X is a matrix
     if(!is.matrix(X))
@@ -180,7 +180,7 @@ kernel.kmeans <- function(
 data(spirals)
 data <- spirals
 rm(spirals)
-
+actuals <- km$cluster   ## using SpectralClustering code 
 ##### Option A 
 #calculating the kernel matrix
 kernelmatrix=matrix(0,nrow(data),nrow(data))
@@ -192,8 +192,6 @@ for(i in 1:nrow(data)){
 K <- kernelmatrix
 rm(kernelmatrix)
 
-##### Option B
-K <- rbfkernelMx ( X= data, sigma = 0.08)
 
 ###### agains normal kmeans with kernel=Identity
 clusters <- 2
@@ -204,10 +202,32 @@ rassign <- sapply(1:nrow(K)/part, function(x) floor(x)+1)
 for(i in 1:nrow(K)) {
   assignments[i,rassign[i]] <- 1
 }
+
+## discrete grid search space 
+si <- c(2^-10,2^-9,2^-8,2^-7,2^-6,2^-5,2^-4,2^-3,2^-2,2^-1,
+        2, 2^2,2^3,2^4,2^5,2^6,2^7,2^8,2^9,2^10)
+dftuneRes <- dplyr::tibble(sigma = numeric(), accuracy= numeric())
+for(i in 1:length(si)){
+  ##### Option B
+  K <- rbfkernelMx ( X= data, sigma = si[i])
+  # Own Kernel Kmeans
+  Z <- kernel.kmeans(K, clusters = clusters, iter.max = 10,
+                     assignments = assignments)
+  target <- apply(Z, 1, which.max)
+  cmTrain=table(actuals, target)
+  accuracyTrain = sum(diag(cmTrain))/sum(cmTrain)
+  dftuneRes <- dftuneRes%>% 
+                  dplyr::add_row(sigma =  si[i],
+                                 accuracy= accuracyTrain)
+}
+## get best sigma hyperparameter
+bestSigma <- dftuneRes[which.max(dftuneRes$accuracy),1]%>% pull(sigma)
+K <- rbfkernelMx ( X= data, sigma = bestSigma)
 # Own Kernel Kmeans
 Z <- kernel.kmeans(K, clusters = clusters, iter.max = 10,
                    assignments = assignments)
 target <- apply(Z, 1, which.max)
+
 # Regular Kmeans
 centers <- (t(assignments) %*% as.matrix(data[,1:2])) / apply(assignments, 2, sum)
 kmns <- kmeans(data[,1:2], iter.max = 10,centers = centers)
@@ -215,6 +235,6 @@ kmns <- kmeans(data[,1:2], iter.max = 10,centers = centers)
 #plot(data$x1, data$x2, col=target)
 #plot(data$x1, data$x2, col=kmns$cluster)
 # plot spiral data 
-plot(data[,1], data[,2], col=target, main="Custom Kernel K-means sigma 0.08")
+plot(data[,1], data[,2], col=target, main=bquote("Custom Kernel K-means" ~  sigma==.(bestSigma)))
 plot(data[,1], data[,2], col=kmns$cluster, main="K-means")
 
