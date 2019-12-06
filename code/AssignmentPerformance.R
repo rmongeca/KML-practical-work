@@ -1,4 +1,5 @@
 library(caret)
+library(mcclust)
 
 ## Assignment vector to matrix
 # Utility function to get an assignment matrix from a vector of
@@ -35,8 +36,12 @@ assignment.performance <- function(
     ref <- apply(R, 1, which.max) %>% factor(labels=labels)
     # Generate confusion matrix
     cm <- confusionMatrix(pred, ref)
+    # Get error rate
     error.rate <- (cm$table[1,2]+cm$table[2,1])/nrow(R)
     names(error.rate) <- "Error rate"
+    # Get variation of information measure
+    vi <- vi.dist(pred, ref)
+    names(vi) <- "Variation of Information"
     return(list(
         confusion.matrix=cm$table,
         error.rate=error.rate,
@@ -44,6 +49,7 @@ assignment.performance <- function(
         kappa=cm$overall[2],
         sensitivity=cm$byClass[1],
         precision=cm$byClass[5],
-        recall=cm$byClass[6]
+        recall=cm$byClass[6],
+        vi=vi
     ))
 }
