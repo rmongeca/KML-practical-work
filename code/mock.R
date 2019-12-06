@@ -171,3 +171,40 @@ kmns <- kmeans(data[,1:2], iter.max = 10,centers = centers)
 plot(data[,1], data[,2], col=target, main=bquote("Custom Kernel K-means" ~  sigma==.(bestSigma)))
 plot(data[,1], data[,2], col=kmns$cluster, main="K-means")
 
+
+############## Example use Spectral Clustering ###################
+
+library(kernlab)
+data(spirals)
+data <- spirals
+rm(spirals)
+
+# A Gaussian kernel, s, to calculate the similarity between two points.
+s <- function(x1, x2, alpha=1) {
+  exp(- alpha * norm(as.matrix(x1-x2), type="F"))
+}
+
+make.similarity <- function(my.data, similarity) {
+  N <- nrow(my.data)
+  S <- matrix(rep(NA,N^2), ncol=N)
+  for(i in 1:N) {
+    for(j in 1:N) {
+      if (i!=j) {
+        S[i,j] <- similarity(my.data[i,], my.data[j,])
+      } else {
+        S[i,j] <- 0
+      }
+    }
+  }
+  S
+}
+# similarity matrix, S,  
+S <- make.similarity(data, s)
+
+spectralCl <- spectralClustering(S = S,
+                                 n.neighboors=3,
+                                 clusters = 2, 
+                                 laplacian = "unnormalized")
+
+
+plot(data[,1], data[,2], col=labels, main="spectral")

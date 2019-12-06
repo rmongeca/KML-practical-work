@@ -39,7 +39,7 @@ spectralClustering <- function(
     L <- D - A
   } else if(laplacian == "normalizedSymmetric"){ #Ng, Jordan, and Weiss (2002)
     L <- (D %^% (-1/2)) %*% A %*% (D %^% (-1/2))
-    # additional multiplication D might lead to 
+    # additional multiplication D might lead to undesired
   } else if(laplacian=="normalizedRandomWalk"){ # preferred by Von Luxburg, U. (2007). 
     # cluster indicator vectors 1_{A_i}
     L <- (D %^% (-1)) %*% A
@@ -56,9 +56,12 @@ spectralClustering <- function(
   }else if(method=="pam"){
     classes <- cluster::pam(x = Z, k = clusters,cluster.only=TRUE,diss = FALSE)
   }else if(method=="discretization"){
-    source("code/internal.R")
     res <- sort(abs(evL$values),index.return = TRUE)
     U <- evL$vectors[,res$ix[1:clusters]]
+    normalize <- function(x) x / sqrt(sum(x^2))
+    if(laplacian == "normalizedSymmetric"){
+      U = t(apply(U,1,normalize))
+    }
     eigDiscrete = .discretisation(U)
     eigDiscrete = eigDiscrete$discrete
     classes = apply(eigDiscrete,1,which.max)
@@ -68,5 +71,66 @@ spectralClustering <- function(
     assignments[i,classes[i]] <- 1
   }
   return(assignments)
+}
+
+
+######## Internal Functions ##############
+
+.discretisation <- function(eigenVectors) {
+  
+  normalize <- function(x) x / sqrt(sum(x^2))
+  eigenVectors = t(apply(eigenVectors,1,normalize))
+  
+  n = nrow(eigenVectors)
+  k = ncol(eigenVectors)
+  
+  R = matrix(0,k,k)
+  R[,1] = t(eigenVectors[round(n/2),])
+  
+  mini <- function(x) {
+    i = which(x == min(x))
+    return(i[1])
+  }
+  
+  c = matrix(0,n,1)
+  for (j in 2:k) {
+    c = c + abs(eigenVectors %*% matrix(R[,j-1],k,1))
+    i = mini(c)
+    R[,j] = t(eigenVectors[i,])
+  }
+  
+  lastObjectiveValue = 0
+  for (i in 1:20) {
+    eigenDiscrete = .discretisationEigenVectorData(eigenVectors %*% R)
+    
+    svde = svd(t(eigenDiscrete) %*% eigenVectors)
+    U = svde[['u']]
+    V = svde[['v']]
+    S = svde[['d']]
+    
+    NcutValue = 2 * (n-sum(S))
+    if(abs(NcutValue - lastObjectiveValue) < .Machine$double.eps) 
+      break
+    
+    lastObjectiveValue = NcutValue
+    R = V %*% t(U)
+    
+  }
+  
+  return(list(discrete=eigenDiscrete,continuous =eigenVectors))
+}
+
+.discretisationEigenVectorData <- function(eigenVector) {
+  
+  Y = matrix(0,nrow(eigenVector),ncol(eigenVector))
+  maxi <- function(x) {
+    i = which(x == max(x))
+    return(i[1])
+  }
+  j = apply(eigenVector,1,maxi)
+  Y[cbind(1:nrow(eigenVector),j)] = 1
+  
+  return(Y)
+  
 }
 
