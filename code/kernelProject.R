@@ -15,6 +15,7 @@
 library(dplyr)
 library(kernlab)
 library(tm)
+library(proxy)
 set.seed(42)
 
 ######################################################
@@ -42,7 +43,7 @@ reutest <- read.delim("data/r52-test-no-stop.txt", header = FALSE,
 reuters <- rbind(reutrain ,reutest) 
 rm(reutrain, reutest)
 # Get topic counts to select topic
-topic.counts <- reutrain %>% group_by(Topic) %>% summarise(Count=n()) %>% arrange(desc(Count))
+topic.counts <- reuters %>% group_by(Topic) %>% summarise(Count=n()) %>% arrange(desc(Count))
 # We keep the topics crude, trade and ship 
 topics <- c("crude", "trade", "ship")
 # Own colnames
@@ -151,12 +152,25 @@ kernelTuneCV <- kernel.tune(data = tuneData ,
 ######################################################
 
 # Transform data to DocumentTermMatrix for regular k-means
-# with weighting given by the term frequency–inverse document frequency
+# use the tf–idf(term frequency–inverse document frequency) 
+# instead of the frequencies of the term as entries, 
+# tf-idf measures the relative importance of a word to a document.
 # and reduce dimensions allowing only up to 0.95 matrix sparsity
-corpus <- VCorpus(VectorSource(reuters$Document))
-dt.mat <- DocumentTermMatrix(corpus,
+corpus <- VCorpus(VectorSource(reuters$Document))%>%
+            tm::tm_map(stemDocument)
+corpus <- tm_map(corpus, PlainTextDocument)
+dt.mat <- DocumentTermMatrix(corpus ,
                              control = list(weighting = weightTfIdf)) %>% 
-  removeSparseTerms(sparse = 0.95)
+            removeSparseTerms(sparse = 0.95) 
+dist.matrix = proxy::dist(as.matrix(dt.mat), method = "cosine")
+km <- kmeans(dist.matrix,centers=k,nstart = 10, iter.max =100)
+
+classes <- km$cluster
+assignmentsKM <- matrix(0, nrow = length(classes), ncol = k)
+for(i in 1:length(classes)) {
+  assignmentsKM[i,classes[i]] <- 1
+}
+perfKM <- assignment.performance(assignmentsKM, ref)
 
 
 ## plot 
