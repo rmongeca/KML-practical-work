@@ -1,5 +1,6 @@
 library(caret)
 library(mcclust)
+library(combinat)
 
 ## Assignment vector to matrix
 # Utility function to get an assignment matrix from a vector of
@@ -32,24 +33,40 @@ assignment.performance <- function(
 ) {
     # Number of clusters
     clusters <- ncol(Z)
-    pred <- apply(Z, 1, which.max) %>% factor(labels=labels)
+    # Reference classes
     ref <- apply(R, 1, which.max) %>% factor(labels=labels)
-    # Generate confusion matrix
-    cm <- confusionMatrix(pred, ref)
-    # Get error rate
-    error.rate <- (cm$table[1,2]+cm$table[2,1])/nrow(R)
-    names(error.rate) <- "Error rate"
+    # Permutation of columns
+    perm <- permn(1:ncol(Z))
+    # Get error rate of each permutation and take
+    # best permutation to compute performance
+    best.error.rate <- Inf
+    for(p in perm) {
+        Zp <- Z[,p]
+        pred <- apply(Zp, 1, which.max) %>% factor(labels=labels)
+        # Generate confusion matrix
+        cm <- confusionMatrix(pred, ref)
+        # Get error rate
+        error.rate <- mean(pred != ref)
+        if(best.error.rate > error.rate) {
+            best.error.rate <- error.rate
+            best.cm <- cm
+            best.p <- p
+            best.pred <- pred
+        }
+    }
+    names(best.error.rate) <- "Error rate"
     # Get variation of information measure
-    vi <- vi.dist(pred, ref)
+    vi <- vi.dist(best.pred, ref)
     names(vi) <- "Variation of Information"
     return(list(
-        confusion.matrix=cm$table,
-        error.rate=error.rate,
-        accuracy=cm$overall[1],
-        kappa=cm$overall[2],
-        sensitivity=cm$byClass[1],
-        precision=cm$byClass[5],
-        recall=cm$byClass[6],
-        vi=vi
+        confusion.matrix=best.cm$table,
+        error.rate=best.error.rate,
+        accuracy=best.cm$overall[1],
+        kappa=best.cm$overall[2],
+        sensitivity=best.cm$byClass[1],
+        precision=best.cm$byClass[5],
+        recall=best.cm$byClass[6],
+        vi=vi,
+        permutation=best.p
     ))
 }
