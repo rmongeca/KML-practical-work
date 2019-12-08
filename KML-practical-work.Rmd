@@ -121,7 +121,7 @@ Given the undirected graph associated with the previous data point sample and it
 
 this matrices give insights on the properties of the graph.
 
-The problem of clustering the data points $\{ x_1, ..., x_n\}$ can be viewed as graph partition problem into groups such that the similarities between points of different groups are small and between points of the same group are big.
+The problem of clustering the data points $\{ x_1, ..., x_n\}$ into $k$ clusters can be viewed as graph partition problem into groups such that the similarities between points of different groups are small and between points of the same group are big.
 
 # Experiments
 
