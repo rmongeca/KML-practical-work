@@ -42,14 +42,14 @@ reutest <- read.delim("data/r52-test-no-stop.txt", header = FALSE,
                       stringsAsFactors = FALSE)
 reuters <- rbind(reutrain ,reutest) 
 rm(reutrain, reutest)
+# Own colnames
+cols <- c("Topic", "Document")
+# Change cols
+colnames(reuters) <- cols
 # Get topic counts to select topic
 topic.counts <- reuters %>% group_by(Topic) %>% summarise(Count=n()) %>% arrange(desc(Count))
 # We keep the topics crude, trade and ship 
 topics <- c("crude", "trade", "ship")
-# Own colnames
-cols <- c("Topic", "Document")
-# Change cols and filter topics
-colnames(reuters) <- cols
 reuters <- reuters %>% filter(Topic %in% topics) %>% 
               mutate(Topic=factor(Topic))
 # Get number of instances and topics
@@ -84,10 +84,10 @@ clusteringMethod <- function(
   nclust, # Number of cluster for method
   nCV){
   if(method=="kernel.kmeans"){
-    Z <- kernel.kmeans(K, clusters=nclust,nrandomSet = nCV)
+    Z <- kernel.kmeans(K, clusters=nclust, nrandomSet = nCV)
   }
   if(method=="spectralClustering"){
-    Z <- spectralClustering(S=K, clusters=nclust,nrandomSet= nCV )
+    Z <- spectralClustering(S=K, clusters=nclust, nrandomSet= nCV )
   }
   return(Z)
 }
@@ -136,7 +136,7 @@ kernel.tune <- function(
 ##################   MODEL TUNING    #################
 ######################################################
 tuneData <- reuters$Document
-clustMethod <- c("spectralClustering")
+clustMethod <- c("spectralClustering","kernel.kmeans")
 gridSpace <- data.frame(length=c(2,5,10,15,20))
 ref <- assignment.matrix(reuters$Topic)
 
