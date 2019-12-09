@@ -62,10 +62,9 @@ assignment.performance <- function(
         confusion.matrix=best.cm$table,
         error.rate=best.error.rate,
         accuracy=best.cm$overall[1],
-        kappa=best.cm$overall[2],
-        sensitivity=best.cm$byClass[1],
-        precision=best.cm$byClass[5],
-        recall=best.cm$byClass[6],
+        sensitivity=mean(best.cm$byClass[,1]),
+        precision=mean(best.cm$byClass[,5]),
+        recall=mean(best.cm$byClass[,6]),
         vi=vi,
         permutation=best.p
     ))

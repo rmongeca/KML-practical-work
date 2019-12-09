@@ -38,9 +38,9 @@ source("code/SpectralClustering.R")
 # a TAB character and then a sequence of "words" delimited by spaces,
 # representing the terms contained in the document.
 # Train/test set
-reutrain <- read.delim("data/r52-train-no-stop.txt", header = FALSE,
+reutrain <- read.delim("data/r52-train-stemmed.txt", header = FALSE,
                        stringsAsFactors = FALSE)
-reutest <- read.delim("data/r52-test-no-stop.txt", header = FALSE,
+reutest <- read.delim("data/r52-test-stemmed.txt", header = FALSE,
                       stringsAsFactors = FALSE)
 reuters <- rbind(reutrain ,reutest) 
 rm(reutrain, reutest)
@@ -51,7 +51,7 @@ colnames(reuters) <- cols
 # Get topic counts to select topic
 topic.counts <- reuters %>% group_by(Topic) %>% summarise(Count=n()) %>% arrange(desc(Count))
 # We keep the topics crude, trade and ship 
-topics <- c("crude", "trade", "ship")
+topics <- c("interest", "crude", "coffee")
 reuters <- reuters %>% filter(Topic %in% topics) %>% 
               mutate(Topic=factor(Topic))
 # Get number of instances and topics
@@ -105,7 +105,7 @@ kernel.tune <- function(
   reference # Reference object to use with control function to compare to model
 ) {
   out.cv <- grid.space %>% 
-              mutate(type="spectrum",
+              mutate(type="boundrange",
                      normalized = TRUE,
                      CVkk = 0, 
                      CVspecc = 0)
@@ -139,7 +139,7 @@ kernel.tune <- function(
 ######################################################
 tuneData <- reuters$Document
 clustMethod <- c("spectralClustering","kernel.kmeans")
-gridSpace <- data.frame(length=c(2,5,10,15,20,25,30))
+gridSpace <- data.frame(length=c(2,5,7,10,12,15,20,25))
 ref <- assignment.matrix(reuters$Topic)
 
 kernelTuneCV <- kernel.tune(data = tuneData ,
@@ -158,8 +158,7 @@ kernelTuneCV <- kernel.tune(data = tuneData ,
 # instead of the frequencies of the term as entries, 
 # tf-idf measures the relative importance of a word to a document.
 # and reduce dimensions allowing only up to 0.95 matrix sparsity
-corpus <- VCorpus(VectorSource(reuters$Document))%>%
-            tm::tm_map(stemDocument)
+corpus <- VCorpus(VectorSource(reuters$Document))
 corpus <- tm_map(corpus, PlainTextDocument)
 dt.mat <- DocumentTermMatrix(corpus ,
                              control = list(weighting = weightTfIdf)) %>% 
@@ -236,18 +235,18 @@ perfKernkk <- assignment.performance(kernkk,ref)
 
 perfSpec <- assignment.performance(spec,ref)
 
-perfDF <- tibble(kernelkk = perfKernkk$vi,specc = perfSpec$vi,kk = perfKM$vi)%>%
-            add_row(kernelkk=perfKernkk$error.rate,specc=perfSpec$error.rate, kk=perfKM$error.rate) %>%
-            add_row(kernelkk=perfKernkk$accuracy,specc=perfSpec$accuracy, kk=perfKM$accuracy) %>%
-            add_row(kernelkk=perfKernkk$kappa,specc=perfSpec$kappa, kk=perfKM$kappa) %>%
-            add_row(kernelkk=perfKernkk$sensitivity,specc=perfSpec$sensitivity, kk=perfKM$sensitivity) %>%
-            add_row(kernelkk=perfKernkk$precision,specc=perfSpec$precision, kk=perfKM$precision) %>%
-            add_row(kernelkk=perfKernkk$recall,specc=perfSpec$recall, kk=perfKM$recall) 
+perfDF <- tibble(kernelkmeans = perfKernkk$vi,specc = perfSpec$vi,kmeans = perfKM$vi)%>%
+            add_row(kernelkmeans=perfKernkk$error.rate,specc=perfSpec$error.rate, kmeans=perfKM$error.rate) %>%
+            add_row(kernelkmeans=perfKernkk$accuracy,specc=perfSpec$accuracy, kmeans=perfKM$accuracy) %>%
+            add_row(kernelkmeans=perfKernkk$sensitivity,specc=perfSpec$sensitivity, kmeans=perfKM$sensitivity) %>%
+            add_row(kernelkmeans=perfKernkk$precision,specc=perfSpec$precision, kmeans=perfKM$precision) %>%
+            add_row(kernelkmeans=perfKernkk$recall,specc=perfSpec$recall, kmeans=perfKM$recall) 
 
 
-rownames(perfDF) <- c("vi", "error.rate", "accuracy", "kappa", "sensitivity",
-                      "precision", "recall")
+rownames(perfDF) <- c("vi", "error.rate", "accuracy", "sensitivity","precision", "recall")
 
 
 saveRDS(perfDF, file = "performanceMeasures")
+
+
 
