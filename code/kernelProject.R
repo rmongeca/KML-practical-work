@@ -16,6 +16,8 @@ library(dplyr)
 library(kernlab)
 library(tm)
 library(proxy)
+library(tidyr)
+library(ggplot2)
 set.seed(42)
 
 ######################################################
@@ -137,7 +139,7 @@ kernel.tune <- function(
 ######################################################
 tuneData <- reuters$Document
 clustMethod <- c("spectralClustering","kernel.kmeans")
-gridSpace <- data.frame(length=c(2,5,10,15,20))
+gridSpace <- data.frame(length=c(2,5,10,15,20,25,30))
 ref <- assignment.matrix(reuters$Topic)
 
 kernelTuneCV <- kernel.tune(data = tuneData ,
@@ -171,15 +173,81 @@ for(i in 1:length(classes)) {
   assignmentsKM[i,classes[i]] <- 1
 }
 perfKM <- assignment.performance(assignmentsKM, ref)
+rm(corpus, dt.mat, dist.matrix)
 
+######################################################
+############ Compare &  Best Tune    #################
+######################################################
 
-## plot 
+dfplot <- cbind(kernelTuneCV, km=perfKM$vi) %>%
+            dplyr::select(-c(type,normalized ))%>%
+            tidyr::gather("method","vi" ,CVkk:km)%>%
+            mutate(method = ifelse(method=="CVkk", "kernelKmeans", 
+                                   ifelse(method=="CVspecc", "spectralClustering",
+                                          "kmeans")))
 
-## best lambdas
+ggplot(dfplot, aes(length,  vi, color = method))+
+geom_line() +
+geom_point()+
+labs(x="string length", y="variation of information") + 
+theme_bw() +
+theme( panel.background = element_rect(colour = "black", size=0.5),
+       panel.grid.minor = element_blank(),
+       panel.grid.major = element_blank(),
+      axis.text.y = element_text(size=8),
+      axis.text.x = element_text(size=8),
+      axis.title.y=element_text(size=9),
+      axis.title.x=element_text(size=9),
+      plot.title = element_text(size=10),
+      legend.position="bottom",
+      legend.title = element_blank(),
+      legend.text = element_text( size=7),
+      legend.key.height=unit(0.5,"line"),
+      legend.key.width=unit(0.5,"line"))
 
+######################################################
+############ Run Methods   #################
+######################################################
+
+nrandomS <- 10
+## best lambda
+lambda_kk <- dfplot %>% filter(method == "kernelKmeans") %>% 
+                slice(which.min(vi)) %>% pull(length)
+## compute Kernel Matrix with best lambda
+sk_kk <- stringdot(length= lambda_kk,type = "spectrum", normalized = TRUE)
+K <- kernelMatrix(sk_kk, tuneData)
 ## do clustering method using customs functions
+kernkk <- kernel.kmeans(K, clusters=k, nrandomSet = nrandomS)
 
-## with Z do assignment.performance
-                            
-  
+## best lambda
+lambda_spec <- dfplot %>% filter(method == "spectralClustering") %>% 
+                slice(which.min(vi)) %>% pull(length)
+## compute Kernel Matrix with best lambda
+sk_spec <- stringdot(length= lambda_spec,type = "spectrum", normalized = TRUE)
+K <- kernelMatrix(sk_spec, tuneData)
+## do clustering method using customs functions
+spec <- spectralClustering(S=K, clusters=k, nrandomSet= nrandomS )
+
+######################################################
+############ Performance &  Compare  #################
+######################################################
+
+perfKernkk <- assignment.performance(kernkk,ref)
+
+perfSpec <- assignment.performance(spec,ref)
+
+perfDF <- tibble(kernelkk = perfKernkk$vi,specc = perfSpec$vi,kk = perfKM$vi)%>%
+            add_row(kernelkk=perfKernkk$error.rate,specc=perfSpec$error.rate, kk=perfKM$error.rate) %>%
+            add_row(kernelkk=perfKernkk$accuracy,specc=perfSpec$accuracy, kk=perfKM$accuracy) %>%
+            add_row(kernelkk=perfKernkk$kappa,specc=perfSpec$kappa, kk=perfKM$kappa) %>%
+            add_row(kernelkk=perfKernkk$sensitivity,specc=perfSpec$sensitivity, kk=perfKM$sensitivity) %>%
+            add_row(kernelkk=perfKernkk$precision,specc=perfSpec$precision, kk=perfKM$precision) %>%
+            add_row(kernelkk=perfKernkk$recall,specc=perfSpec$recall, kk=perfKM$recall) 
+
+
+rownames(perfDF) <- c("vi", "error.rate", "accuracy", "kappa", "sensitivity",
+                      "precision", "recall")
+
+
+saveRDS(perfDF, file = "performanceMeasures")
 
